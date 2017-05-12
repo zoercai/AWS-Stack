@@ -1,0 +1,144 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Resources": {
+    "LF9MBL": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "zoe-lambda-test",
+          "S3Key" : "lambda-java-example-1.0-SNAPSHOT.jar"
+        },
+        "FunctionName": "SimpleRequest",
+        "Handler": "api.ApiRequestHandler",
+        "MemorySize": 128,
+        "Role":"arn:aws:iam::465521767555:role/service-role/execute_my_lambda",
+        "Runtime":"java8"
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Designer": {
+          "id": "66b2b325-f19a-4d7d-a7a9-943dd8cd4a5c"
+        }
+      }
+    },
+    "Deployment": {
+      "Type": "AWS::ApiGateway::Deployment",
+      "Properties": {
+        "RestApiId": { "Ref": "AGRA16PAA" },
+        "Description": "First Deployment",
+        "StageName": "StagingStage"
+      },
+      "DependsOn" : ["AGM25KFD"]
+    },
+    "AGM25KFD": {
+      "Type": "AWS::ApiGateway::Method",
+      "Properties": {
+        "AuthorizationType": "NONE",
+        "HttpMethod": "GET",
+        "ResourceId": {
+          "Ref": "AGR2JDQ8"
+        },
+        "RestApiId": {
+          "Ref": "AGRA16PAA"
+        },
+        "Integration": {
+          "Type": "AWS",
+          "IntegrationHttpMethod": "POST",
+          "IntegrationResponses": [{
+            "StatusCode": 200
+          }],
+          "Uri": {
+            "Fn::Join": [
+              "",
+              [
+                "arn:aws:apigateway:",
+                {
+                  "Ref": "AWS::Region"
+                },
+                ":lambda:path/2015-03-31/functions/",
+                {
+                  "Fn::GetAtt": [
+                    "LF9MBL",
+                    "Arn"
+                  ]
+                },
+                "/invocations"
+              ]
+            ]
+          }
+        },
+        "MethodResponses": [{
+          "StatusCode": 200
+        }]
+      },
+      "DependsOn": [
+        "LF9MBL",
+        "AGR2JDQ8",
+        "LPI6K5"
+      ]
+    },
+    "AGRA16PAA": {
+      "Type": "AWS::ApiGateway::RestApi",
+      "Properties": {"Name": "CalculationApi"}
+    },
+    "AGR2JDQ8": {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "RestApiId": {"Ref": "AGRA16PAA"},
+        "ParentId": {
+          "Fn::GetAtt": ["AGRA16PAA","RootResourceId"]
+        },
+        "PathPart": "divide"
+      },
+      "DependsOn": [
+        "AGRA16PAA"
+      ]
+    },
+    "LPI6K5": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:invokeFunction",
+        "FunctionName": {"Fn::GetAtt": ["LF9MBL", "Arn"]},
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {"Fn::Join": ["",
+          ["arn:aws:execute-api:", {"Ref": "AWS::Region"}, ":", {"Ref": "AWS::AccountId"}, ":", {"Ref": "AGRA16PAA"}, "/*"]
+        ]}
+      }
+    },
+    "KinesisEventProcessor": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "zoe-lambda-test",
+          "S3Key" : "lambda-java-example-1.0-SNAPSHOT.jar"
+        },
+        "FunctionName": "KinesisEventProcessor",
+        "Handler": "stream.ProcessKinesisEvents",
+        "Role": "arn:aws:iam::465521767555:role/service-role/execute_my_lambda",
+        "Runtime": "java8"
+      }
+    },
+    "EventsStream": {
+      "Type": "AWS::Kinesis::Stream",
+      "Properties": {
+        "Name": "GeofenceEventStream",
+        "ShardCount": 1
+      }
+    },
+    "GeofenceStreamEventSource": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "KinesisEventProcessor"
+        },
+        "Enabled": true,
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "EventsStream",
+            "Arn"
+          ]
+        },
+        "StartingPosition": "TRIM_HORIZON"
+      }
+    }
+  }
+}
